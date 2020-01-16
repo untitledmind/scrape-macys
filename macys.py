@@ -45,20 +45,18 @@ def get_product_data(url, agent):
 #     import sqlite3
 
 #     name = product['name']
-#     context = product['@context']
 #     category = product['category']
 #     productID = product['productID']
 #     image = product['image']
 #     url = product['url']
-#     product_type = product['type']
-#     brand = product['brand']
-#     offers = product['offers']
+#     product_type = product['@type']
+#     brand = product['brand']['name']
 #     description = product['description']
 #     currency = product['offers'][0]['itemOffered']['priceCurrency']
 #     price = product['offers'][0]['itemOffered']['price']
 #     sku = product['offers'][0]['itemOffered']['SKU']
-
-#     sqlite3.adapt
+    # availability = product['offers'][0]['itemOffered']['availability']
+    # price_valid_until = product['offers'][0]['itemOffered']['priceValidUntil']
 
 #     """CREATE TABLE products
 
