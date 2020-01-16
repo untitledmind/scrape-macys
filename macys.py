@@ -54,34 +54,34 @@ def get_product_data(url, agent):
     # asset = json.loads(soup.find('script', {'type': 'text/javascript'}).text)
     return product #, asset
 
-def post_to_sql(products):
+def push_to_sql(products):
     """takes list of each product's data
-    posts to SQL table
+    pushes to SQL table
     """
     import sqlite3
 
     with sqlite3.connect('macys_products.db') as conn:
         c = conn.cursor()
-
         c.execute(
             """CREATE TABLE IF NOT EXISTS products (
-            product_id INT,
-            name VARCHAR(255),
-            category VARCHAR(255),
-            image VARCHAR(500),
-            url VARCHAR(500),
-            product_type VARCHAR(50),
-            brand VARCHAR(255),
-            description VARCHAR(500),
-            currency VARCHAR(5),
-            price FLOAT,
-            sku VARCHAR(15),
-            availability VARCHAR(100),
-            price_valid_until VARCHAR(25)
+                product_id INT,
+                name VARCHAR(255),
+                category VARCHAR(255),
+                image VARCHAR(500),
+                url VARCHAR(500),
+                product_type VARCHAR(50),
+                brand VARCHAR(255),
+                description VARCHAR(500),
+                currency VARCHAR(5),
+                price FLOAT,
+                sku VARCHAR(15),
+                availability VARCHAR(100),
+                price_valid_until VARCHAR(25)
             );
             """
         )
 
+        rows = []
         for product in products:
             name = product.get('name')
             category = product.get('category')
@@ -97,13 +97,15 @@ def post_to_sql(products):
             availability = product.get('offers')[0].get('availability')
             price_valid_until = product.get('offers')[0].get('priceValidUntil')
 
-            data = (product_id, name, category, image, url, product_type, brand, description, currency, price, sku, availability, price_valid_until)
-            placeholders = ', '.join(['?'] * len(items))
-
+            data = (product_id, name, category, image, url, product_type, brand, \
+                description, currency, price, sku, availability, price_valid_until)
+            placeholders = ', '.join(['?'] * len(data))
             print(data)
-            print(placeholders)
 
-            c.execute(f'INSERT INTO products VALUES ({placeholders});', data)
+            rows.append(data)
+
+        c.executemany(f'INSERT INTO products VALUES ({placeholders});', rows)
+        print('Pushed data to SQL table')
 
 def main():
     """begins function chain starting at Macy's index page
@@ -120,21 +122,25 @@ def main():
     url = 'https://www.macys.com/shop/sitemap-index?id=199462'
     agent = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15'}
     categories = get_category_href(url, agent)
-    print(len(categories))
-    print(categories)
+    print(f'{len(categories)} categories found')
     
     product_links = set()
     for i, url in enumerate(categories):
         product_links.update(get_product_href(url, agent))
-        print(f'clicked on category {i}')
+        print(f'clicked on category {i}...')
         break
 
     products = []
     for i, url in enumerate(product_links):
         products.append(get_product_data(url, agent))
-        print(f'clicked on product {i}')
+        print(f'clicked on product {i}...')
 
-    post_to_sql(products)
+    push_to_sql(products)
 
 if __name__ == '__main__':
+    import time
+
+    start = time.process_time()
     main()
+    end = time.process_time()
+    print(f'Script executed in {end - start} seconds')
