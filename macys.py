@@ -4,6 +4,10 @@ last updated Jan 16 2020
 
 This script creates a database Macy's products by scraping their online website with BeautifulSoup and the requests module.
 Because the program makes http requests in a for-loop context, it's rather slow.
+
+Note: For speed reasons, the loop currently breaks at the first category;
+thus only the first category in the index is scraped for products.
+
 To speed up the script, next step is to implement multithreaded or asynchronous requests.
 """
 
@@ -109,6 +113,9 @@ def main():
     3. product links
     4. product data
     5. to SQL
+
+    Note: Currently the loop breaks at the first category;
+    thus only the first category in the index is scraped for products.
     """
     url = 'https://www.macys.com/shop/sitemap-index?id=199462'
     agent = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15'}
