@@ -1,7 +1,6 @@
 """Macy's web scraper with asyncronous I/O
-Last updated Jan 27 2019
+Last updated Jan 28 2019
 Author: Ethan Brady
-
 issue with SSL handshake in loop 2 in main()
 """
 
@@ -11,20 +10,24 @@ import aiohttp
 import asyncio
 from aiohttp import ClientSession, ClientConnectorError
 from bs4 import BeautifulSoup
+import json
 import time
+import random
 
-def call_soup(url: str, headers: str) -> str:
+def call_soup(url: str) -> str:
     """visits index page and returns soup"""
+    headers = pick_browser()
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
     print(f'found soup from {url}')
     return soup
 
-def get_category_href(url: str, agent: str) -> set:
+def get_category_href(url: str) -> set:
     """finds all category href from index page
     returns set of formatted urls
     ensures index page does not reappear and create infinite loop
     """
+    agent = pick_browser()
     soup = call_soup(url, agent)
     hrefs = {
         format_link(i.get('href'))
@@ -36,16 +39,6 @@ def get_category_href(url: str, agent: str) -> set:
         pass
     print(f'{time.process_time()}: gathered {len(hrefs)} category links')
     return hrefs
-    
-async def fetch_html(url: str, session: ClientSession, headers: dict, **kwargs) -> str:
-    """GET request wrapper to fetch page html and convert to soup
-    headers simulate Apple iPhone running Safari
-    """
-    response = await session.request(method='GET', url=url, headers=headers, **kwargs)
-    print(f'{time.process_time()}: clicked on link {url}')
-    await asyncio.sleep(.0001)
-    html = await response.text()
-    return html
 
 def format_link(url: str) -> str:
     """ensures returned url starts with https://www.macys.com"""
@@ -79,45 +72,7 @@ def soup_product_data(product_links: set) -> set:
     print(f'{time.process_time()}: gathered {len(products)} products')
     return products
 
-async def make_requests(urls: set, headers: dict, **kwargs) -> set:
-    """asynchronously make http requests"""
-    async with ClientSession() as session:
-        tasks = {
-            fetch_html(url, session=session, headers=headers, **kwargs)
-            for url in urls
-        }
-        results = await asyncio.gather(*tasks)
-        return results
-
-def main(url: str, headers: dict) -> None:
-    """begins function calls
-    index page -> category links -> product links -> product data
-    """
-    category_links = get_category_href(url, headers)
-    
-    print('beginning loop 1')
-    loop = asyncio.get_event_loop()
-    category_html = loop.run_until_complete(make_requests(urls=category_links, headers=headers))
-    print('finished loop 1')
-
-    product_links = soup_products(category_html)
-
-    print('beginning loop 2')
-    loop2 = asyncio.get_event_loop()
-    products = loop2.run_until_complete(make_requests(urls=product_links, headers=headers))
-    print('finished loop 2')
-
-    product_data = soup_product_data(products)
-    print(product_data)
-
-if __name__ == '__main__':
-    import pathlib
-    import sys
-
-    assert sys.version_info >= (3, 7), "Script requires Python 3.7+."
-    here = pathlib.Path(__file__).parent
-    
-    url = 'https://www.macys.com/shop/sitemap-index?id=199462'
+def pick_browser() -> str:
     browsers = {
         'chrome': {
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -149,12 +104,93 @@ if __name__ == '__main__':
             'Accept-Language': 'en-us',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive'
+        },
+        'edge': {
+            'Accept': 'text/html, application/xhtml+xml, application/xml; q-0.9, */*; q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'en-US',
+            'Cookie': 'shippingCountry=US; currency=USD; SignedIn=0; GCs=CartItem1_92_03_87_UserName1_92_4_02_; mercury=true; ak_bmsc=98E7D05351C41DE723C0B0337DF3B5C5B81CBF2E0E450000439B305E29E8BC06~plCgU6yWVRKByAjl7Lyo60dUxSickxrTZym1gMDRflfpROfPu+uomPFtmCcYbuXCYjEd1Gkqos3KZmj9YN946H0QbLMGeE1IZuk6l3OiWYobHo8qWniREaDlgF/9e1DFNsU/ERDCbxfCbbKQNC7hBmSsFwB3igozcEw/GpEP8lz1I2/DlaE5CK5fjpzHvQTWc13VLxWxJZlRy6DkLWCMUGezJBAHcAlUsoWKbsoE+ozhneV8l2s4z07XUuEJIR3gQC; _abck=4C6622E625C50ACB42098331F7A0463A~0~YAAQLr8cuNZzqo5vAQAAY4Le7QN8l81yFAncO+2gxwaH1KxKXGfhDxQlrp/hv+kaZJn2d6L6ebP1QMBXFiWedtoy431Dc0qapWLEcWN96twdYBx/3Gvh9ioARwbkIoh3hbMI8QdT6XWrAuQdY5PHzfestwWDEudLVFDgsnFQbggf7DNumuSuo2O1ZvgrwT5wao7OUeEwyHpQ50wDg6Zt9fgcUADIiPUoeiUE20Mx16g5gR5VsoOu3tSb5ykc/Hk6nfQBLWa9Ah+cLrAVONSQtnUfgcDUS5xDUFeluEgmLK89hWZYb8pjmeCLI2mO/edDVo0PyyJL~-1~||1-aOXoeotilh-3500-100-3000-2||~-1; SEED=-2982024998282259990; MISCGCs=USERPC1_92_100013_87_USERLL1_92_40.750787%2C-73.9889593_87_USERST1_92_NY3_87_USERDMA1_92_5013_87_DT1_92_PC3_87_BTZIPCODE1_92_100013_87_BOPSPICKUPSTORE1_92_10; bm_sz=7F04A8182EE6E1B95553C8CB5B48DD41~YAAQLr8cuLpzqo5vAQAAdXze7QYAJ4R5OO/isz7EPYHxw/UMvQHEjmPRDG/CHzf5N/2IbLBpfcbybHoI+erBwR+T9nar2z7FIlVZMrs0Y0PRV/I+HAefIPcK53HW4AnRo1jtuVMV6ORnP6MdCQd3nDCoZxXy9HwOVjcYsLKfwueJKmpYyebB20F2ljOneY8=; FORWARDPAGE_KEY=https%3A%2F%2Fwww.macys.com%2F; AMCV_8D0867C25245AE650A490D4C%40AdobeOrg=-1891778711%7CMCIDTS%7C18290%7CMCMID%7C54883900769510924741608738748639028155%7CMCAAMLH-1580848580%7C7%7CMCAAMB-1580848580%7C6G1ynYcLPuiQxYZrsz_pkqfLG9yMXBpb2zX5dvJdYQJzPXImdj0y%7CMCOPTOUT-1580250980s%7CNONE%7CMCSYNCSOP%7C411-18297%7CMCAID%7CNONE%7CvVersion%7C2.4.0; check=true; mbox=session#98b17eb478fd45f488c96318797acda4#1580245642|PC#98b17eb478fd45f488c96318797acda4.17_0#1643488582; RT=z=1&dm=macys.com&si=4406d0b8-6807-4e34-8f42-030ed2c640ff&ss=k5yccf0n&sl=1&tt=2g4&bcn=%2F%2F17d09915.akstat.io%2F&ld=3b1&ul=3nud; AMCVS_8D0867C25245AE650A490D4C%40AdobeOrg=1; bm_sv=E672EE38B7CA30C1F6E4BC212C905B58~40agdGUI3GjbJJ5dXDLCMhn+cqQExWUW3yexWS0TfxPizUjElOOOax6qiX/ZhRc1WCdZb96NnAmrkC2wxflOzdqDbnO+XSZDOoZrCDMpCEscUF8kCIaUrS5YH3ODZ/+kGoHwbVEKIFC3Lb0e4rD9Fn3RIuSQF7qiDSO+87IH9vE=; dca=WDC; TS01ad411f=011c444591f236e34165cbc70057c6b9e02425de06ce5f408bb94ab857b1c2b0c8a6b2cec677f55b78d6bcacada7cf4b23607fbf06dd1062cf8c15928567ae64b7cfdc1258; SFL=10; CSL=10; utag_main=v_id:016fedde88840018b49e08b1eed501081001607900bd0$_sn:1$_ss:0$_st:1580245582153$ses_id:1580243781766%3Bexp-session$_pn:1%3Bexp-session$vapi_domain:macys.com; s_pers=%20c29%3Dmcom%253Ahome%2520page%7C1580245581989%3B%20v30%3Dhome%2520page%7C1580245581995%3B; s_sess=%20s_cc%3Dtrue%3B; TLTSID=46519822324218705028751339087124; cd_user_id=16fedde912436-07e3d2ecf55c16-784a5935-1fa400-16fedde91253b; _ga=GA1.2.1235793273.1580243784; _gid=GA1.2.480841982.1580243784; sto__session=1580243786048; sto__count=0; cto_bundle=ijB3Dl8yZGtSWDIlMkI5YkM3OHVtUU1KUDczYXpjMHZuQkNqUHFRb3hiZ3lkM3RscEklMkJvUWtvcXhCdEpNMENxS0Q1cHVCRVglMkJXUk1MNTBwUWFhZkd6eTZ0VW5aaEdGUjR5aXFEa2JiY3NHb25oNDIyTDRqTE1IUndsWlhsd1Bka3klMkYxUnJkTXlXZkp6dHFGSDhWYjdXbmI4Nk5FUSUzRCUzRA; sto__vuid=2214fd0015e4291bcbd8f341dcced477; smtrrmkr=637158405885268606%5E016fedde-a2ef-4526-8cef-be345f546596%5E016fedde-a2ef-481e-aea6-71dbefe3672f%5E0%5E38.98.105.18; CONSENTMGR=ts:1580243949245%7Cconsent:true; akavpau_www_www1_macys=1580244079~id=e9d92ea1c0eec2d2a9ecbf1c965b0c51; TS0132ea28=011c444591eeb1fe44f2f23b0cd8271d1cb19cadbace5f408bb94ab857b1c2b0c8a6b2cec652532ecdf5ad8fedafa4f080e8a9ba25; CRTOABE=0',
+            'If-None-Match': '817d7-BZAs8JxLjU0QTopF0FBWiZoxsMU',
+            'Upgrade-Insecure-Requests': '1',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/18.17763'
         }
     }
+    headers = random.choice(list(browsers.values()))
+    return headers
 
-    headers = browsers['safari']
+def call_proxies() -> list:
+    """request proxies from sslproxies.org
+    returns list of tuples, each holding IP address and port"""
+    return proxies
+
+def pick_proxy(proxies: list) -> tuple:
+    ip, port = random.choice(proxies)
+    proxy = {'https': f'http://{ip}:{port}'}
+    return proxy
+
+def dodge_detection(proxies: list):
+    """randomly chooses a headers set, delay time, 
+    nd proxy IP address to avoid detection
+    """
+    headers = pick_browser()
+    proxy = pick_proxy(proxies)
+    delay = random.uniform(0.001, 1.0)
+    return headers, proxy, delay
+
+async def fetch_html(url: str, session: ClientSession, proxies: list, **kwargs) -> str:
+    """GET request wrapper to fetch page html and convert to soup
+    headers simulate Apple iPhone running Safari
+    """
+    headers, proxy, delay = await dodge_detection(proxies)
+    response = await session.request(method='GET', url=url, headers=headers, proxy=proxy, **kwargs)
+    print(f'{round(time.process_time(),3)}: with status {response.status}, clicked on link {url}')
+    await asyncio.sleep(delay)
+    html = await response.text()
+    return html
+    
+async def make_requests(urls: set, proxies: list, **kwargs) -> set:
+    """asynchronously make http requests"""
+    async with ClientSession() as session:
+        tasks = {
+            fetch_html(url, session=session, proxies=proxies, **kwargs)
+            for url in urls
+        }
+        results = await asyncio.gather(*tasks)
+        return results
+
+def main(url: str) -> None:
+    """begins function calls
+    index page -> category links -> product links -> product data
+    """
+    category_links = get_category_href(url)
+    
+    print('beginning loop 1')
+    proxies = call_proxies()
+    loop = asyncio.get_event_loop()
+    category_html = loop.run_until_complete(make_requests(urls=category_links, proxies=proxies))
+    print('finished loop 1')
+
+    product_links = soup_products(category_html)
+
+    print('beginning loop 2')
+    proxies = call_proxies()
+    loop2 = asyncio.get_event_loop()
+    products = loop2.run_until_complete(make_requests(urls=product_links, proxies=proxies))
+    print('finished loop 2')
+
+    product_data = soup_product_data(products)
+    print(product_data)
+
+if __name__ == '__main__':
+    import pathlib
+    import sys
+
+    assert sys.version_info >= (3, 7), "Script requires Python 3.7+."
+    here = pathlib.Path(__file__).parent
+    
+    url = 'https://www.macys.com/shop/sitemap-index?id=199462'
 
     start = time.process_time()
-    main(url, headers)
+    main(url)
     end = time.process_time()
     print(f'script executed in {end - start} seconds')
