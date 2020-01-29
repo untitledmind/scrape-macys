@@ -74,6 +74,9 @@ def soup_product_data(product_links: set) -> set:
     return products
 
 def pick_browser() -> str:
+    """picks one of browser-specific request headers
+    tested for each browser visiting macys.com
+    """
     browsers = {
         'chrome': {
             'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
@@ -121,7 +124,8 @@ def pick_browser() -> str:
 
 def call_proxies() -> list:
     """request proxies from sslproxies.org
-    returns list of tuples, each holding IP address and port"""
+    returns list of tuples, each holding IP address and port
+    """
     response = requests.get('https://sslproxies.org')
     soup = BeautifulSoup(response.text, 'html.parser')
     table = soup.find('table').find_all('td')
@@ -131,20 +135,18 @@ def call_proxies() -> list:
         row = table[chunk:chunk + 8]
         ip = row[0].text
         port = row[1].text
-        # age = int(re.sub(r' minrow[7].text)
         proxies.append((ip, port))
 
     return proxies
 
 def pick_proxy(proxies: list) -> tuple:
     ip, port = random.choice(proxies)
-    # proxy = str({'http': f'http://{ip}:{port}'})
     proxy = f'http://{ip}:{port}'
     return proxy, ip, port
 
 def dodge_detection(proxies: list):
     """randomly chooses a headers set, delay time, 
-    nd proxy IP address to avoid detection
+    and proxy IP address to avoid detection
     """
     headers = pick_browser()
     proxy, ip, port = pick_proxy(proxies)
@@ -153,7 +155,7 @@ def dodge_detection(proxies: list):
 
 async def fetch_html(url: str, session: ClientSession, proxies: list, **kwargs) -> str:
     """GET request wrapper to fetch page html and convert to soup
-    headers simulate Apple iPhone running Safari
+    headers and proxy are randomly chosen to dodge detection as robot
     """
     while True:
         try:
