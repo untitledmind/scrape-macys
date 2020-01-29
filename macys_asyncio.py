@@ -1,6 +1,7 @@
 """Macy's web scraper with asyncronous I/O
 Last updated Jan 28 2019
 Author: Ethan Brady
+
 issue with SSL handshake in loop 2 in main()
 """
 
@@ -8,7 +9,7 @@ import requests
 import re
 import aiohttp
 import asyncio
-from aiohttp import ClientSession, ClientConnectorError
+from aiohttp import ClientSession, ClientConnectorError, ClientHttpProxyError, ClientProxyConnectionError
 from bs4 import BeautifulSoup
 import json
 import time
@@ -28,7 +29,7 @@ def get_category_href(url: str) -> set:
     ensures index page does not reappear and create infinite loop
     """
     agent = pick_browser()
-    soup = call_soup(url, agent)
+    soup = call_soup(url)
     hrefs = {
         format_link(i.get('href'))
         for i in soup.find_all('a', href=re.compile('/shop'))
@@ -95,7 +96,7 @@ def pick_browser() -> str:
             'DNT': '1',
             'TE': 'Trailers',
             'Upgrade-Insecure-Requests': '1',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel …) Gecko/20100101 Firefox/72.0'
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0'
         },
         'safari': {
             'Cookie': 'bm_sv=6C12CAB332303B1203C2544E6B29C69C~7CX6PC/3LnPP5HjGUJqpFhpvOpWt8fn0jIVrHyIuygc2R2oCXWEuIlERsXQBFo3FDnXMsFFRzmqBECPyajsMkkeK3YVIY6FWDvwgTJgEzEvFfL3sEuFkl7iWPnTzuxZ1/5nEUPM8yQohPSKbQOvDDPe2qy2Z+0bOMEKE8sQSsxE=; CSL=5359; MISCGCs=USERPC1_92_752253_87_USERLL1_92_32.869876%2C-96.7724843_87_USERST1_92_TX3_87_USERDMA1_92_6233_87_DT1_92_PC3_87_BTZIPCODE1_92_752013_87_BOPSPICKUPSTORE1_92_5359; GCs=CartItem1_92_03_87_UserName1_92_4_02_; SFL=5359; dca=D12; FORWARDPAGE_KEY=https%3A%2F%2Fwww.macys.com%2Fshop%2Fproduct%2Fholiday-lane-gold-tone-crystal-pink-rose-pin-created-for-macys%3FID%3D10348036%26CategoryID%3D264958; SEED=-8782270029644492310%7C535-21; akavpau_www_www1_macys=1580185514~id=014b6feef7e1f194c04588716670a7f4; RTD=85be80856760855770855ca08511d0858e7085a6d0852470; ak_bmsc=0252C18C558CD784FB21B5634956EB5E174DE6BF8A760000C9A52F5EDCEAA66C~pl/Y+jLc7tp9kHFxo4ry4trPSqaTCHxbvmUxQdesQx+EcWrUMQOWvimXUl2sqrr4QDRyqW4L/Z9idlRYvp1mjTyGxX6Nmg2CGqcq3WCHXJedsbIH/RV9GpdUEXq6izT8iyUNya2b5Tly7y1JPPLv8iIVYxySaApEPuCMsy6xAH/0fCMYp0Vgda7izmbLzMgwqWEngDkJvO7zyoSdLyHLidOVe8YXwiF090EwjOEn0qBVc17K5Yl5xVpvd5ufouA2Qf; _abck=6BF046B8069834250D8410952CA7B656~0~YAAQv+ZNF59nLX5uAQAAqrEf6gNRMHj+06g0cisKzNlsn2QsKRBZzgh2IG8mtJsy2exwyCs9APwVhgamkGp0UWCBIHvwTOYhFLu88BuO+Xmt6AxgQIRZEYnen1IUBzofFMBk9YkgbeCh925a9dwrQ/AmPx9gA7yeoi239FOcUe+dDwjcIg6UyHlZtOFUP4J4EL4M4lh9dUoGNS4CfZ7X0H7NCeRDZ/QqpvRgJqgztXyGCGfiEELVFCxp/3ye4XQKEidqHui11sV7+J4BnShjLpIj7OQC9uwR1Yr8pxvOQ+B2talFlWtb8dUQmeM/7TGZUxCwm3vJ~-1~||1-hMldRrKyOp-3500-100-3000-2||~-1; SignedIn=0; bm_sz=6B23C6DF8923EFFE1783CC8A25DF4282~YAAQv+ZNF4FnLX5uAQAAcpsf6gbm08MDGc386e/W1H6Y1M5rp3+V1c8rRzgQ62cE0QDfUAdycTZGp9j7p4g2RM22b/D3c10gpXOh21gYbb6TR0R946d+QRD5fnUYRIsW4QnLr1sdpwlATHo0AQeSQYBhqtNJoUr6IQiXb04kTBf0hoGnS9dee6vc+VdRwL4=; currency=USD; mercury=true; shippingCountry=US',
@@ -121,28 +122,48 @@ def pick_browser() -> str:
 def call_proxies() -> list:
     """request proxies from sslproxies.org
     returns list of tuples, each holding IP address and port"""
+    response = requests.get('https://sslproxies.org')
+    soup = BeautifulSoup(response.text, 'html.parser')
+    table = soup.find('table').find_all('td')
+
+    proxies = []
+    for chunk in range(0, len(table), 8):
+        row = table[chunk:chunk + 8]
+        ip = row[0].text
+        port = row[1].text
+        # age = int(re.sub(r' minrow[7].text)
+        proxies.append((ip, port))
+
     return proxies
 
 def pick_proxy(proxies: list) -> tuple:
     ip, port = random.choice(proxies)
-    proxy = {'https': f'http://{ip}:{port}'}
-    return proxy
+    # proxy = str({'http': f'http://{ip}:{port}'})
+    proxy = f'http://{ip}:{port}'
+    return proxy, ip, port
 
 def dodge_detection(proxies: list):
     """randomly chooses a headers set, delay time, 
     nd proxy IP address to avoid detection
     """
     headers = pick_browser()
-    proxy = pick_proxy(proxies)
-    delay = random.uniform(0.001, 1.0)
-    return headers, proxy, delay
+    proxy, ip, port = pick_proxy(proxies)
+    delay = random.uniform(0.001, 0.5)
+    return headers, proxy, delay, ip, port
 
 async def fetch_html(url: str, session: ClientSession, proxies: list, **kwargs) -> str:
     """GET request wrapper to fetch page html and convert to soup
     headers simulate Apple iPhone running Safari
     """
-    headers, proxy, delay = await dodge_detection(proxies)
-    response = await session.request(method='GET', url=url, headers=headers, proxy=proxy, **kwargs)
+    while True:
+        try:
+            headers, proxy, delay, ip, port = dodge_detection(proxies)
+            response = await session.request(method='GET', url=url, headers=headers, proxy=proxy, **kwargs)
+        except (ClientHttpProxyError, ClientProxyConnectionError) as e:
+            proxies.remove((ip, port))
+        else:
+            break
+
     print(f'{round(time.process_time(),3)}: with status {response.status}, clicked on link {url}')
     await asyncio.sleep(delay)
     html = await response.text()
@@ -150,7 +171,7 @@ async def fetch_html(url: str, session: ClientSession, proxies: list, **kwargs) 
     
 async def make_requests(urls: set, proxies: list, **kwargs) -> set:
     """asynchronously make http requests"""
-    async with ClientSession() as session:
+    async with ClientSession(headers={"Connection": "close"}) as session:
         tasks = {
             fetch_html(url, session=session, proxies=proxies, **kwargs)
             for url in urls
